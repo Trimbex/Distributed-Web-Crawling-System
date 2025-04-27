@@ -31,9 +31,9 @@ class MasterNode:
         else:
             # Default seed URLs
             seed_urls = [
-                "https://example.com",
+                "https://www.python.org/",
                 "https://example.org",
-                "https://www.wikipedia.org"
+                "https://www.wikipedia.org",
             ]
             
         for url in seed_urls:
