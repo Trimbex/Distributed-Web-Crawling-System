@@ -19,7 +19,8 @@ def run_crawler_system(num_crawler_nodes=2):
     try:
         # Start the MPI processes
         logging.info(f"Starting crawler system with {num_crawler_nodes} crawler nodes...")
-        cmd = ["mpiexec", "-n", str(total_nodes), "python", "master_node.py"]
+        cmd = ["mpiexec",
+    "--oversubscribe", "-n", str(total_nodes), "python", "master_node.py"]
         
         proc = subprocess.Popen(cmd)
         
