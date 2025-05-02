@@ -22,7 +22,7 @@ logging.basicConfig(
 )
 
 class MasterNode:
-    def __init__(self, crawler_nodes, indexer_nodes, seed_urls=None, use_sqs=True):
+    def __init__(self, crawler_nodes, indexer_nodes, seed_urls=None, use_sqs=True, region_name='us-east-1'):
         """Initialize the master node with crawler and indexer information"""
         self.hostname = socket.gethostname()
         self.ip_address = socket.gethostbyname(self.hostname)
@@ -34,10 +34,10 @@ class MasterNode:
         # SQS setup
         self.use_sqs = use_sqs
         if use_sqs:
-            self.sqs = boto3.client('sqs')
+            self.sqs = boto3.client('sqs', region_name=region_name)
             self.task_queue_url = self.get_queue_url('crawler-tasks')
             self.result_queue_url = self.get_queue_url('crawler-results')
-            logging.info(f"Using SQS queues for task management")
+            logging.info(f"Using SQS queues for task management in region {region_name}")
 
         # Initialize visited URLs set
         self.visited_urls = set()
@@ -277,6 +277,7 @@ def main():
     parser.add_argument('--port', type=int, default=5000, help='Port for the API server')
     parser.add_argument('--seed-urls', nargs='+', default=['https://example.com'], help='Seed URLs to start crawling')
     parser.add_argument('--use-sqs', action='store_true', help='Use Amazon SQS for task queuing')
+    parser.add_argument('--region', default='us-east-1', help='AWS region for SQS')
     args = parser.parse_args()
 
     # In a real system, these would come from configuration or service discovery
@@ -290,7 +291,7 @@ def main():
     ]
 
     # Initialize master node
-    master = MasterNode(crawler_nodes, indexer_nodes, args.seed_urls, args.use_sqs)
+    master = MasterNode(crawler_nodes, indexer_nodes, args.seed_urls, args.use_sqs, args.region)
 
     # Start task monitoring thread
     monitor_thread = Thread(target=monitor_tasks, args=(master,))
