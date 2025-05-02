@@ -31,6 +31,26 @@ class MasterNode:
         self.crawler_nodes = crawler_nodes
         self.indexer_nodes = indexer_nodes
         
+        # Initialize statistics first
+        self.stats = {
+            "urls_queued": 0,
+            "urls_crawled": 0,
+            "urls_failed": 0,
+            "start_time": datetime.now().isoformat(),
+            "active_crawlers": 0
+        }
+        
+        # Initialize visited URLs set
+        self.visited_urls = set()
+        self.seen_urls = set()
+        
+        # Task management
+        self.task_id_counter = 0
+        self.active_tasks = {}  # {task_id: (url, crawler_ip, timestamp)}
+        
+        # Crawler heartbeats
+        self.crawler_heartbeats = {}  # {crawler_ip: last_heartbeat_time}
+        
         # SQS setup
         self.use_sqs = use_sqs
         if use_sqs:
@@ -39,32 +59,12 @@ class MasterNode:
             self.result_queue_url = self.get_queue_url('crawler-results')
             logging.info(f"Using SQS queues for task management in region {region_name}")
 
-        # Initialize visited URLs set
-        self.visited_urls = set()
-        self.seen_urls = set()
-
         # Add seed URLs to queue
         if seed_urls:
             for url in seed_urls:
                 if url not in self.seen_urls:
                     self.add_url_to_queue(url)
                     self.seen_urls.add(url)
-
-        # Task management
-        self.task_id_counter = 0
-        self.active_tasks = {}  # {task_id: (url, crawler_ip, timestamp)}
-        
-        # Crawler heartbeats
-        self.crawler_heartbeats = {}  # {crawler_ip: last_heartbeat_time}
-
-        # Statistics
-        self.stats = {
-            "urls_queued": 0,
-            "urls_crawled": 0,
-            "urls_failed": 0,
-            "start_time": datetime.now().isoformat(),
-            "active_crawlers": 0
-        }
 
         logging.info(f"Master node initialized at {self.ip_address}")
         logging.info(f"Connected to {len(crawler_nodes)} crawler nodes and {len(indexer_nodes)} indexer nodes")
