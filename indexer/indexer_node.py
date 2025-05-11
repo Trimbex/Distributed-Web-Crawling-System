@@ -451,16 +451,13 @@ def start_api_server(indexer, port=5002):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NexusCrawl | Distributed Search Engine</title>
+    <title>WebCrawl | Search Engine</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         :root {
-            --primary: #2c3e50;
-            --secondary: #3498db;
-            --accent: #e74c3c;
-            --success: #2ecc71;
-            --warning: #f39c12;
-            --error: #e74c3c;
+            --primary: #1a2a6c;
+            --secondary: #b21f1f;
+            --accent: #fdbb2d;
             --background: #f8f9fa;
             --text: #2c3e50;
             --light-text: #7f8c8d;
@@ -482,7 +479,7 @@ def start_api_server(indexer, port=5002):
         }
         
         .container {
-            max-width: 1200px;
+            max-width: 1000px;
             margin: 0 auto;
             padding: 0 20px;
         }
@@ -498,29 +495,30 @@ def start_api_server(indexer, port=5002):
             display: flex;
             align-items: center;
             margin-bottom: 1.5rem;
+            justify-content: center;
         }
         
         .brand i {
-            font-size: 2rem;
-            margin-right: 10px;
+            font-size: 2.5rem;
+            margin-right: 15px;
             color: #fdbb2d;
         }
         
         .brand h1 {
             font-weight: 600;
-            font-size: 2rem;
+            font-size: 2.5rem;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
         }
         
         .tagline {
             font-size: 1.1rem;
-            margin-bottom: 1.5rem;
+            margin-bottom: 2rem;
             text-align: center;
             color: rgba(255,255,255,0.9);
         }
         
         .search-container {
-            max-width: 800px;
+            max-width: 700px;
             margin: 0 auto;
         }
         
@@ -528,30 +526,37 @@ def start_api_server(indexer, port=5002):
             display: flex;
             border-radius: 50px;
             background: white;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
             overflow: hidden;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+        
+        .search-form:focus-within {
+            border-color: var(--accent);
+            box-shadow: 0 4px 25px rgba(0,0,0,0.2);
         }
         
         .search-box {
             flex: 1;
-            padding: 15px 25px;
+            padding: 18px 25px;
             border: none;
             font-size: 1.1rem;
             outline: none;
         }
         
         .search-button {
-            background: var(--accent);
+            background: var(--secondary);
             color: white;
             border: none;
-            padding: 0 30px;
+            padding: 0 35px;
             font-size: 1.1rem;
             cursor: pointer;
             transition: background 0.3s;
         }
         
         .search-button:hover {
-            background: #c0392b;
+            background: #921919;
         }
         
         .main-content {
@@ -569,7 +574,7 @@ def start_api_server(indexer, port=5002):
         
         .results-count {
             padding: 4px 12px;
-            background: var(--secondary);
+            background: var(--primary);
             color: white;
             border-radius: 20px;
             font-size: 0.9rem;
@@ -582,11 +587,11 @@ def start_api_server(indexer, port=5002):
         
         .result {
             background: var(--card);
-            border-radius: 8px;
+            border-radius: 12px;
             padding: 1.5rem;
             box-shadow: 0 2px 8px rgba(0,0,0,0.06);
             transition: transform 0.2s, box-shadow 0.2s;
-            border-left: 4px solid var(--secondary);
+            border-left: 4px solid var(--primary);
         }
         
         .result:hover {
@@ -600,7 +605,7 @@ def start_api_server(indexer, port=5002):
         }
         
         .result h3 a {
-            color: var(--secondary);
+            color: var(--primary);
             text-decoration: none;
         }
         
@@ -650,7 +655,7 @@ def start_api_server(indexer, port=5002):
         
         .stats-card {
             background: var(--card);
-            border-radius: 8px;
+            border-radius: 12px;
             padding: 1.5rem;
             margin-top: 2rem;
             box-shadow: 0 2px 8px rgba(0,0,0,0.06);
@@ -672,21 +677,21 @@ def start_api_server(indexer, port=5002):
         
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
             gap: 1rem;
         }
         
         .stat-item {
-            background: #f1f5f9;
-            border-radius: 8px;
-            padding: 1rem;
+            background: #f7f9fa;
+            border-radius: 10px;
+            padding: 1.2rem;
             text-align: center;
         }
         
         .stat-value {
             font-size: 1.8rem;
             font-weight: 700;
-            color: var(--secondary);
+            color: var(--primary);
             margin-bottom: 0.3rem;
         }
         
@@ -698,7 +703,7 @@ def start_api_server(indexer, port=5002):
         footer {
             text-align: center;
             padding: 2rem 0;
-            margin-top: 2rem;
+            margin-top: 3rem;
             color: var(--light-text);
             font-size: 0.9rem;
             border-top: 1px solid var(--border);
@@ -706,8 +711,7 @@ def start_api_server(indexer, port=5002):
         
         @media (max-width: 768px) {
             .search-form {
-                flex-direction: column;
-                border-radius: 8px;
+                border-radius: 12px;
             }
             
             .search-button {
@@ -722,14 +726,14 @@ def start_api_server(indexer, port=5002):
         
         .no-results {
             background: var(--card);
-            border-radius: 8px;
-            padding: 2rem;
+            border-radius: 12px;
+            padding: 3rem 2rem;
             text-align: center;
             box-shadow: 0 2px 8px rgba(0,0,0,0.06);
         }
         
         .no-results i {
-            font-size: 3rem;
+            font-size: 3.5rem;
             color: var(--light-text);
             margin-bottom: 1rem;
         }
@@ -737,206 +741,29 @@ def start_api_server(indexer, port=5002):
         .no-results h3 {
             font-weight: 600;
             margin-bottom: 0.5rem;
+            font-size: 1.5rem;
         }
         
         .no-results p {
             color: var(--light-text);
         }
         
-        /* Seed URL submission form */
-        .seed-url-form {
-            margin-top: 2rem;
-            background: var(--card);
-            border-radius: 8px;
-            padding: 1.5rem;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        .welcome {
+            text-align: center;
+            padding: 3rem 0;
         }
         
-        .form-title {
-            font-size: 1.2rem;
+        .welcome h2 {
+            font-size: 2rem;
             margin-bottom: 1rem;
             color: var(--primary);
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
         }
         
-        .form-title i {
-            margin-right: 8px;
-            color: var(--secondary);
-        }
-        
-        .crawler-status-indicator {
-            font-size: 0.85rem;
-            display: flex;
-            align-items: center;
-            padding: 4px 10px;
-            border-radius: 50px;
-            background: #f5f5f5;
-            margin-left: auto;
-        }
-        
-        .crawler-status-indicator.connected {
-            background-color: rgba(46, 204, 113, 0.15);
-            color: #27ae60;
-        }
-        
-        .crawler-status-indicator.disconnected {
-            background-color: rgba(231, 76, 60, 0.15);
-            color: #c0392b;
-        }
-        
-        .crawler-status-indicator i {
-            margin-right: 5px;
-            color: inherit;
-        }
-        
-        .crawler-status-indicator span {
-            margin-right: 5px;
-        }
-        
-        .refresh-status {
-            color: inherit;
-            opacity: 0.7;
-            transition: all 0.2s ease;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 20px;
-            height: 20px;
-        }
-        
-        .refresh-status:hover {
-            opacity: 1;
-            transform: rotate(180deg);
-        }
-        
-        .form-group {
-            display: flex;
-            margin-bottom: 1rem;
-        }
-        
-        .form-control {
-            flex: 1;
-            padding: 12px 15px;
-            border: 1px solid var(--border);
-            border-radius: 4px 0 0 4px;
-            font-size: 1rem;
-            outline: none;
-        }
-        
-        .form-control:focus {
-            border-color: var(--secondary);
-        }
-        
-        .btn-submit {
-            background: var(--secondary);
-            color: white;
-            border: none;
-            padding: 0 20px;
-            border-radius: 0 4px 4px 0;
-            font-size: 1rem;
-            cursor: pointer;
-            transition: background 0.3s;
-        }
-        
-        .btn-submit:hover {
-            background: #2980b9;
-        }
-        
-        .form-help {
-            font-size: 0.9rem;
-            color: var(--light-text);
-        }
-        
-        /* Flash messages */
-        .flash-messages {
-            margin-bottom: 1.5rem;
-        }
-        
-        .flash {
-            padding: 12px 15px;
-            border-radius: 4px;
-            margin-bottom: 1rem;
-            font-size: 0.95rem;
-        }
-        
-        .flash-success {
-            background-color: rgba(46, 204, 113, 0.15);
-            border-left: 4px solid var(--success);
-            color: #27ae60;
-        }
-        
-        .flash-error {
-            background-color: rgba(231, 76, 60, 0.15);
-            border-left: 4px solid var(--error);
-            color: #c0392b;
-        }
-        
-        .flash-warning {
-            background-color: rgba(243, 156, 18, 0.15);
-            border-left: 4px solid var(--warning);
-            color: #d35400;
-        }
-        
-        /* Seed URL Examples Styling */
-        .seed-example-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 1rem;
-        }
-        
-        .seed-example {
-            display: flex;
-            align-items: center;
-            background: #f8f9fa;
-            padding: 1rem;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        
-        .seed-example:hover {
-            background: #e9f0f8;
-            transform: translateY(-2px);
-        }
-        
-        .seed-icon {
-            font-size: 1.5rem;
-            width: 40px;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: var(--secondary);
-            color: white;
-            border-radius: 8px;
-            margin-right: 0.8rem;
-        }
-        
-        .seed-info {
-            flex: 1;
-        }
-        
-        .seed-name {
-            font-weight: 600;
-            color: var(--primary);
-        }
-        
-        .seed-url {
-            font-size: 0.85rem;
-            color: var(--light-text);
-        }
-        
-        .copy-icon {
-            color: var(--light-text);
-            padding: 0.5rem;
+        .welcome p {
             font-size: 1.1rem;
-        }
-        
-        .seed-example:hover .copy-icon {
-            color: var(--secondary);
+            color: var(--light-text);
+            max-width: 600px;
+            margin: 0 auto;
         }
     </style>
 </head>
@@ -945,7 +772,7 @@ def start_api_server(indexer, port=5002):
         <div class="container">
             <div class="brand">
                 <i class="fas fa-spider"></i>
-                <h1>NexusCrawl</h1>
+                <h1>WebCrawl</h1>
             </div>
             <div class="tagline">Unveiling the web's hidden connections</div>
             <div class="search-container">
@@ -961,48 +788,6 @@ def start_api_server(indexer, port=5002):
     
     <main class="main-content">
         <div class="container">
-            <!-- Flash Messages -->
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    <div class="flash-messages">
-                        {% for category, message in messages %}
-                            <div class="flash flash-{{ category }}">{{ message }}</div>
-                        {% endfor %}
-                    </div>
-                {% endif %}
-            {% endwith %}
-            
-            <!-- Add Seed URL Form -->
-            <div class="seed-url-form">
-                <div class="form-title">
-                    <i class="fas fa-plus-circle"></i> Add New URL to Crawl
-                    <div class="crawler-status-indicator {% if stats.crawler_status.connected %}connected{% else %}disconnected{% endif %}" 
-                         title="{{ stats.crawler_status.message }} (last checked: {{ stats.crawler_status.last_check }})">
-                        <i class="fas {% if stats.crawler_status.connected %}fa-check-circle{% else %}fa-exclamation-circle{% endif %}"></i>
-                        <span>Crawler {{ 'Online' if stats.crawler_status.connected else 'Offline' }}</span>
-                        <a href="/refresh-connection" class="refresh-status" title="Refresh connection status">
-                            <i class="fas fa-sync-alt"></i>
-                        </a>
-                    </div>
-                </div>
-                <form action="/submit-url" method="post" id="seed-form">
-                    <div class="form-group">
-                        <input type="text" name="seed_url" class="form-control" placeholder="Enter a URL to crawl (e.g., https://example.com)" required>
-                        <button type="submit" class="btn-submit">Submit URL</button>
-                    </div>
-                    <p class="form-help">Add a new website to be crawled and indexed by our distributed system. If the crawler service is unavailable, URLs will be stored locally and submitted later.</p>
-                </form>
-                {% if stats.pending_urls > 0 %}
-                <div style="margin-top: 1rem; text-align: right;">
-                    <form action="/retry-pending" method="post">
-                        <button type="submit" class="btn-submit" style="border-radius: 4px;">
-                            <i class="fas fa-sync-alt"></i> Retry {{ stats.pending_urls }} Pending URLs
-                        </button>
-                    </form>
-                </div>
-                {% endif %}
-            </div>
-            
             {% if query %}
                 <div class="results-info">
                     <h2>Results for "{{ query }}"</h2>
@@ -1043,207 +828,39 @@ def start_api_server(indexer, port=5002):
                     </div>
                 {% endif %}
             {% else %}
-                <div class="stats-card">
-                    <div class="stats-title">
-                        <i class="fas fa-spider"></i> Welcome to NexusCrawl
-                    </div>
-                    <p style="margin-bottom: 1rem;">
-                        A high-performance distributed web crawling system built with Python.
-                        Enter a search query above to explore the indexed content.
-                    </p>
+                <div class="welcome">
+                    <h2>Distributed Web Search</h2>
+                    <p>Enter a query in the search box above to explore content from our distributed crawler.</p>
                 </div>
                 
-                <!-- Seed URL Examples -->
-                <div class="stats-card" style="margin-top: 1.5rem;">
+                <div class="stats-card">
                     <div class="stats-title">
-                        <i class="fas fa-lightbulb"></i> Try These Seed URLs
+                        <i class="fas fa-chart-pie"></i> System Statistics
                     </div>
-                    <p style="margin-bottom: 1rem;">
-                        Not sure where to start? Try adding these popular websites to the crawler:
-                    </p>
-                    <div class="seed-examples">
-                        <div class="seed-example-grid">
-                            <div class="seed-example" onclick="copyToClipboard('https://en.wikipedia.org')">
-                                <div class="seed-icon"><i class="fab fa-wikipedia-w"></i></div>
-                                <div class="seed-info">
-                                    <div class="seed-name">Wikipedia</div>
-                                    <div class="seed-url">https://en.wikipedia.org</div>
-                                </div>
-                                <div class="copy-icon"><i class="far fa-copy"></i></div>
-                            </div>
-                            <div class="seed-example" onclick="copyToClipboard('https://news.ycombinator.com')">
-                                <div class="seed-icon"><i class="fab fa-hacker-news"></i></div>
-                                <div class="seed-info">
-                                    <div class="seed-name">Hacker News</div>
-                                    <div class="seed-url">https://news.ycombinator.com</div>
-                                </div>
-                                <div class="copy-icon"><i class="far fa-copy"></i></div>
-                            </div>
-                            <div class="seed-example" onclick="copyToClipboard('https://github.com')">
-                                <div class="seed-icon"><i class="fab fa-github"></i></div>
-                                <div class="seed-info">
-                                    <div class="seed-name">GitHub</div>
-                                    <div class="seed-url">https://github.com</div>
-                                </div>
-                                <div class="copy-icon"><i class="far fa-copy"></i></div>
-                            </div>
-                            <div class="seed-example" onclick="copyToClipboard('https://stackoverflow.com')">
-                                <div class="seed-icon"><i class="fab fa-stack-overflow"></i></div>
-                                <div class="seed-info">
-                                    <div class="seed-name">Stack Overflow</div>
-                                    <div class="seed-url">https://stackoverflow.com</div>
-                                </div>
-                                <div class="copy-icon"><i class="far fa-copy"></i></div>
-                            </div>
-                            <div class="seed-example" onclick="copyToClipboard('https://www.reddit.com')">
-                                <div class="seed-icon"><i class="fab fa-reddit-alien"></i></div>
-                                <div class="seed-info">
-                                    <div class="seed-name">Reddit</div>
-                                    <div class="seed-url">https://www.reddit.com</div>
-                                </div>
-                                <div class="copy-icon"><i class="far fa-copy"></i></div>
-                            </div>
-                            <div class="seed-example" onclick="copyToClipboard('https://developer.mozilla.org')">
-                                <div class="seed-icon"><i class="fab fa-firefox-browser"></i></div>
-                                <div class="seed-info">
-                                    <div class="seed-name">MDN Web Docs</div>
-                                    <div class="seed-url">https://developer.mozilla.org</div>
-                                </div>
-                                <div class="copy-icon"><i class="far fa-copy"></i></div>
-                            </div>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="stat-value">{{ stats.pages_indexed }}</div>
+                            <div class="stat-label">Pages Indexed</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">{{ stats.index_size_mb }}</div>
+                            <div class="stat-label">Index Size (MB)</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">{{ stats.searches_performed }}</div>
+                            <div class="stat-label">Searches Performed</div>
                         </div>
                     </div>
                 </div>
             {% endif %}
-            
-            <div class="stats-card">
-                <div class="stats-title">
-                    <i class="fas fa-chart-pie"></i> System Statistics
-                </div>
-                <div class="stats-grid">
-                    <div class="stat-item">
-                        <div class="stat-value">{{ stats.pages_indexed }}</div>
-                        <div class="stat-label">Documents Indexed</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value">{{ stats.index_size_mb }}</div>
-                        <div class="stat-label">Index Size (MB)</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value">{{ stats.searches_performed }}</div>
-                        <div class="stat-label">Searches Performed</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value">{{ stats.seed_urls_submitted }}</div>
-                        <div class="stat-label">URLs Submitted</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value">{{ stats.pending_urls }}</div>
-                        <div class="stat-label">Pending URLs</div>
-                    </div>
-                </div>
-            </div>
         </div>
     </main>
     
     <footer>
         <div class="container">
-            <p>NexusCrawl - Distributed Web Crawling System &copy; 2025 | Advanced Cloud Computing Project</p>
+            <p>WebCrawl - Distributed Search Engine &copy; 2025</p>
         </div>
     </footer>
-    
-    <script>
-        // Optional: Add JavaScript for AJAX form submission
-        document.addEventListener('DOMContentLoaded', function() {
-            const seedForm = document.getElementById('seed-form');
-            
-            // Uncomment this if you want AJAX submission instead of page reload
-            /*
-            seedForm.addEventListener('submit', function(e) {
-                e.preventDefault();
-                
-                const url = seedForm.querySelector('input[name="seed_url"]').value;
-                
-                fetch('/submit-url', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                        'X-Requested-With': 'XMLHttpRequest'
-                    },
-                    body: `seed_url=${encodeURIComponent(url)}`
-                })
-                .then(response => response.json())
-                .then(data => {
-                    // Create flash message dynamically
-                    const flashContainer = document.querySelector('.flash-messages');
-                    if (!flashContainer) {
-                        const container = document.querySelector('.container');
-                        const newFlashContainer = document.createElement('div');
-                        newFlashContainer.className = 'flash-messages';
-                        container.prepend(newFlashContainer);
-                    }
-                    
-                    const flashElement = document.createElement('div');
-                    flashElement.className = `flash flash-${data.success ? 'success' : 'error'}`;
-                    flashElement.textContent = data.message;
-                    
-                    document.querySelector('.flash-messages').appendChild(flashElement);
-                    
-                    // Clear form if successful
-                    if (data.success) {
-                        seedForm.reset();
-                    }
-                    
-                    // Auto-remove flash after 5 seconds
-                    setTimeout(() => {
-                        flashElement.remove();
-                    }, 5000);
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                });
-            });
-            */
-        });
-        
-        // Function to copy seed URL to clipboard and to the form
-        function copyToClipboard(text) {
-            // Copy to clipboard
-            navigator.clipboard.writeText(text).then(() => {
-                // Also fill the form input
-                const seedInput = document.querySelector('input[name="seed_url"]');
-                if (seedInput) {
-                    seedInput.value = text;
-                    seedInput.focus();
-                    
-                    // Create a flash message
-                    const flashContainer = document.querySelector('.flash-messages');
-                    if (!flashContainer) {
-                        const container = document.querySelector('.container');
-                        const newFlashContainer = document.createElement('div');
-                        newFlashContainer.className = 'flash-messages';
-                        container.prepend(newFlashContainer);
-                    }
-                    
-                    const flashElement = document.createElement('div');
-                    flashElement.className = 'flash flash-success';
-                    flashElement.textContent = `Copied "${text}" to form. Click Submit to add it!`;
-                    
-                    document.querySelector('.flash-messages').appendChild(flashElement);
-                    
-                    // Scroll to the form
-                    document.querySelector('.seed-url-form').scrollIntoView({ behavior: 'smooth' });
-                    
-                    // Auto-remove flash after 5 seconds
-                    setTimeout(() => {
-                        flashElement.remove();
-                    }, 5000);
-                }
-            }).catch(err => {
-                console.error('Failed to copy: ', err);
-            });
-        }
-    </script>
 </body>
 </html>
             ''')
