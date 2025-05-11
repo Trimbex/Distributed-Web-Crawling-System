@@ -6,6 +6,7 @@ import socket
 import logging
 import argparse
 import requests
+import threading
 from flask import Flask, request, jsonify, render_template, redirect, url_for, flash
 from threading import Lock
 import whoosh.index as index
@@ -31,6 +32,7 @@ class IndexerNode:
         self.hostname = socket.gethostname()
         self.ip_address = socket.gethostbyname(self.hostname)
         self.crawler_api_url = crawler_api_url
+        self.crawler_status = self.test_crawler_connection()
         
         # Create directory for pending URLs if it doesn't exist
         self.pending_urls_file = os.path.join(index_dir, "pending_urls.txt")
@@ -46,7 +48,8 @@ class IndexerNode:
             "index_size_bytes": 0,
             "searches_performed": 0,
             "seed_urls_submitted": 0,
-            "pending_urls": self._count_pending_urls()
+            "pending_urls": self._count_pending_urls(),
+            "crawler_status": self.crawler_status
         }
 
         logging.info(f"Indexer node initialized at {self.ip_address}")
@@ -104,10 +107,14 @@ class IndexerNode:
 
     def submit_seed_url(self, url):
         """Submit a seed URL to the crawler for processing"""
-        if not self.crawler_api_url:
-            logging.error("Crawler API URL not configured")
+        # First, check the connection status
+        self.crawler_status = self.test_crawler_connection()
+        self.stats["crawler_status"] = self.crawler_status
+        
+        if not self.crawler_api_url or not self.crawler_status["connected"]:
+            logging.error(f"Crawler API unavailable: {self.crawler_status['message']}")
             self._store_pending_url(url)
-            return False, "Crawler API URL not configured. URL has been saved and will be submitted later."
+            return False, f"Crawler service unavailable: {self.crawler_status['message']}. URL has been saved and will be submitted later."
             
         try:
             # Ensure URL has a scheme
@@ -195,6 +202,10 @@ class IndexerNode:
     def get_status(self):
         """Get the current status of the indexer"""
         self.update_stats()
+        
+        # Refresh crawler connection status
+        self.crawler_status = self.test_crawler_connection()
+        self.stats["crawler_status"] = self.crawler_status
 
         # Add index statistics
         with self.index_lock:
@@ -279,6 +290,43 @@ class IndexerNode:
             logging.error(f"Error storing pending URL {url}: {e}")
             return False
 
+    def test_crawler_connection(self):
+        """Test connection to the crawler service"""
+        if not self.crawler_api_url:
+            return {"connected": False, "message": "No crawler URL configured", "last_check": time.strftime("%Y-%m-%d %H:%M:%S")}
+            
+        try:
+            # Try to connect to the crawler service
+            response = requests.get(
+                f"{self.crawler_api_url}/status", 
+                timeout=2
+            )
+            
+            if response.status_code == 200:
+                return {
+                    "connected": True, 
+                    "message": "Connected to crawler service", 
+                    "last_check": time.strftime("%Y-%m-%d %H:%M:%S")
+                }
+            else:
+                return {
+                    "connected": False, 
+                    "message": f"Crawler service responded with status code {response.status_code}", 
+                    "last_check": time.strftime("%Y-%m-%d %H:%M:%S")
+                }
+        except requests.ConnectionError:
+            return {
+                "connected": False, 
+                "message": "Could not connect to crawler service", 
+                "last_check": time.strftime("%Y-%m-%d %H:%M:%S")
+            }
+        except Exception as e:
+            return {
+                "connected": False, 
+                "message": f"Error checking crawler status: {str(e)}", 
+                "last_check": time.strftime("%Y-%m-%d %H:%M:%S")
+            }
+
 def start_api_server(indexer, port=5002):
     """Start a simple HTTP server to expose indexer node API"""
     app = Flask(__name__)
@@ -324,6 +372,22 @@ def start_api_server(indexer, port=5002):
     def status():
         return jsonify(indexer.get_status())
         
+    @app.route('/refresh-connection', methods=['GET', 'POST'])
+    def refresh_connection():
+        """Refresh the crawler connection status"""
+        indexer.crawler_status = indexer.test_crawler_connection()
+        indexer.stats["crawler_status"] = indexer.crawler_status
+        
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({
+                "success": True,
+                "crawler_status": indexer.crawler_status
+            })
+            
+        flash(f"Connection status: {indexer.crawler_status['message']}", 
+              "success" if indexer.crawler_status['connected'] else "error")
+        return redirect(url_for('search_interface'))
+
     @app.route('/retry-pending', methods=['GET', 'POST'])
     def retry_pending():
         """Manually trigger resubmission of pending URLs"""
@@ -695,11 +759,57 @@ def start_api_server(indexer, port=5002):
             font-weight: 600;
             display: flex;
             align-items: center;
+            justify-content: space-between;
         }
         
         .form-title i {
             margin-right: 8px;
             color: var(--secondary);
+        }
+        
+        .crawler-status-indicator {
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            padding: 4px 10px;
+            border-radius: 50px;
+            background: #f5f5f5;
+            margin-left: auto;
+        }
+        
+        .crawler-status-indicator.connected {
+            background-color: rgba(46, 204, 113, 0.15);
+            color: #27ae60;
+        }
+        
+        .crawler-status-indicator.disconnected {
+            background-color: rgba(231, 76, 60, 0.15);
+            color: #c0392b;
+        }
+        
+        .crawler-status-indicator i {
+            margin-right: 5px;
+            color: inherit;
+        }
+        
+        .crawler-status-indicator span {
+            margin-right: 5px;
+        }
+        
+        .refresh-status {
+            color: inherit;
+            opacity: 0.7;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 20px;
+            height: 20px;
+        }
+        
+        .refresh-status:hover {
+            opacity: 1;
+            transform: rotate(180deg);
         }
         
         .form-group {
@@ -866,6 +976,14 @@ def start_api_server(indexer, port=5002):
             <div class="seed-url-form">
                 <div class="form-title">
                     <i class="fas fa-plus-circle"></i> Add New URL to Crawl
+                    <div class="crawler-status-indicator {% if stats.crawler_status.connected %}connected{% else %}disconnected{% endif %}" 
+                         title="{{ stats.crawler_status.message }} (last checked: {{ stats.crawler_status.last_check }})">
+                        <i class="fas {% if stats.crawler_status.connected %}fa-check-circle{% else %}fa-exclamation-circle{% endif %}"></i>
+                        <span>Crawler {{ 'Online' if stats.crawler_status.connected else 'Offline' }}</span>
+                        <a href="/refresh-connection" class="refresh-status" title="Refresh connection status">
+                            <i class="fas fa-sync-alt"></i>
+                        </a>
+                    </div>
                 </div>
                 <form action="/submit-url" method="post" id="seed-form">
                     <div class="form-group">
@@ -1148,6 +1266,28 @@ def main():
             logging.info(f"Startup: Resubmitted {result['submitted']} pending URLs, {result['failed']} remain pending")
     except Exception as e:
         logging.error(f"Error retrying pending URLs on startup: {e}")
+        
+    # Start background connection monitor thread
+    def connection_monitor():
+        while True:
+            try:
+                indexer.crawler_status = indexer.test_crawler_connection()
+                indexer.stats["crawler_status"] = indexer.crawler_status
+                if indexer.crawler_status["connected"]:
+                    # If connection is restored, try to submit pending URLs
+                    if indexer.stats["pending_urls"] > 0:
+                        result = indexer.retry_pending_urls()
+                        if result["submitted"] > 0:
+                            logging.info(f"Auto-submitted {result['submitted']} pending URLs, {result['failed']} remain pending")
+                # Check every 60 seconds
+                time.sleep(60)
+            except Exception as e:
+                logging.error(f"Error in connection monitor: {e}")
+                time.sleep(60)  # Keep trying even if there's an error
+                
+    # Start the monitor thread as a daemon so it exits when the main program exits
+    monitor_thread = threading.Thread(target=connection_monitor, daemon=True)
+    monitor_thread.start()
     
     start_api_server(indexer, args.port)
 
