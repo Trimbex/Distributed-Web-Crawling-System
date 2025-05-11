@@ -3,6 +3,12 @@
 A high-performance, distributed web crawling and search system built with Python. This project implements a complete search engine solution with distributed crawling, content indexing, and a modern search interface.
 
 <div align="center">
+  <video width="800" controls>
+    <source src="images/2025-05-11 22-27-57.mp4" type="video/mp4">
+    Your browser does not support the video tag.
+  </video>
+  <p><i>WebCrawl System Demo</i></p>
+  <br>
   <img src="images/WhatsApp Image 2025-05-11 at 22.04.17_063f254b.jpg" alt="WebCrawl Search Interface" width="800"/>
   <br><br>
   <img src="images/WhatsApp Image 2025-05-11 at 22.04.03_89cc0683.jpg" alt="WebCrawl Results" width="800"/>
