@@ -5,7 +5,8 @@ import json
 import socket
 import logging
 import argparse
-from flask import Flask, request, jsonify, render_template
+import requests
+from flask import Flask, request, jsonify, render_template, redirect, url_for, flash
 from threading import Lock
 import whoosh.index as index
 from whoosh.fields import Schema, ID, TEXT, STORED
@@ -25,10 +26,11 @@ logging.basicConfig(
 )
 
 class IndexerNode:
-    def __init__(self, index_dir="index_data"):
+    def __init__(self, index_dir="index_data", crawler_api_url=None):
         """Initialize the indexer node"""
         self.hostname = socket.gethostname()
         self.ip_address = socket.gethostbyname(self.hostname)
+        self.crawler_api_url = crawler_api_url
 
         # Create or open search index
         self.index_dir = index_dir
@@ -39,7 +41,8 @@ class IndexerNode:
         self.stats = {
             "pages_indexed": 0,
             "index_size_bytes": 0,
-            "searches_performed": 0
+            "searches_performed": 0,
+            "seed_urls_submitted": 0
         }
 
         logging.info(f"Indexer node initialized at {self.ip_address}")
@@ -94,6 +97,36 @@ class IndexerNode:
                 writer.cancel()
                 logging.error(f"Error indexing {url}: {e}")
                 return False
+
+    def submit_seed_url(self, url):
+        """Submit a seed URL to the crawler for processing"""
+        if not self.crawler_api_url:
+            logging.error("Crawler API URL not configured")
+            return False, "Crawler API URL not configured"
+            
+        try:
+            # Ensure URL has a scheme
+            if not url.startswith(('http://', 'https://')):
+                url = 'http://' + url
+                
+            # Submit to crawler API
+            crawler_endpoint = f"{self.crawler_api_url}/submit"
+            response = requests.post(
+                crawler_endpoint, 
+                json={"url": url}
+            )
+            
+            if response.status_code == 200:
+                self.stats["seed_urls_submitted"] += 1
+                logging.info(f"Seed URL submitted: {url}")
+                return True, "URL successfully submitted for crawling"
+            else:
+                logging.error(f"Failed to submit seed URL: {url}, status: {response.status_code}")
+                return False, f"Failed to submit URL: {response.json().get('error', 'Unknown error')}"
+                
+        except Exception as e:
+            logging.error(f"Error submitting seed URL {url}: {e}")
+            return False, f"Error: {str(e)}"
 
     def search(self, query_str, max_results=10):
         """Enhanced search with support for field-specific queries and boolean operators"""
@@ -162,6 +195,7 @@ class IndexerNode:
 def start_api_server(indexer, port=5002):
     """Start a simple HTTP server to expose indexer node API"""
     app = Flask(__name__)
+    app.secret_key = os.urandom(24)  # For flash messages
 
     @app.route('/index', methods=['POST'])
     def index_document():
@@ -190,6 +224,29 @@ def start_api_server(indexer, port=5002):
     @app.route('/status', methods=['GET'])
     def status():
         return jsonify(indexer.get_status())
+        
+    @app.route('/submit-url', methods=['POST'])
+    def submit_url():
+        """Handle seed URL submission from web interface"""
+        url = request.form.get('seed_url', '').strip()
+        
+        if not url:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({"success": False, "message": "URL is required"}), 400
+            flash("URL is required", "error")
+            return redirect(url_for('search_interface'))
+            
+        success, message = indexer.submit_seed_url(url)
+        
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({"success": success, "message": message})
+            
+        if success:
+            flash(message, "success")
+        else:
+            flash(message, "error")
+            
+        return redirect(url_for('search_interface'))
 
     # Add a simple web interface for search
     @app.route('/', methods=['GET'])
@@ -223,6 +280,9 @@ def start_api_server(indexer, port=5002):
             --primary: #2c3e50;
             --secondary: #3498db;
             --accent: #e74c3c;
+            --success: #2ecc71;
+            --warning: #f39c12;
+            --error: #e74c3c;
             --background: #f8f9fa;
             --text: #2c3e50;
             --light-text: #7f8c8d;
@@ -495,6 +555,97 @@ def start_api_server(indexer, port=5002):
         .no-results p {
             color: var(--light-text);
         }
+        
+        /* Seed URL submission form */
+        .seed-url-form {
+            margin-top: 2rem;
+            background: var(--card);
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        
+        .form-title {
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+            color: var(--primary);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+        }
+        
+        .form-title i {
+            margin-right: 8px;
+            color: var(--secondary);
+        }
+        
+        .form-group {
+            display: flex;
+            margin-bottom: 1rem;
+        }
+        
+        .form-control {
+            flex: 1;
+            padding: 12px 15px;
+            border: 1px solid var(--border);
+            border-radius: 4px 0 0 4px;
+            font-size: 1rem;
+            outline: none;
+        }
+        
+        .form-control:focus {
+            border-color: var(--secondary);
+        }
+        
+        .btn-submit {
+            background: var(--secondary);
+            color: white;
+            border: none;
+            padding: 0 20px;
+            border-radius: 0 4px 4px 0;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .btn-submit:hover {
+            background: #2980b9;
+        }
+        
+        .form-help {
+            font-size: 0.9rem;
+            color: var(--light-text);
+        }
+        
+        /* Flash messages */
+        .flash-messages {
+            margin-bottom: 1.5rem;
+        }
+        
+        .flash {
+            padding: 12px 15px;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+            font-size: 0.95rem;
+        }
+        
+        .flash-success {
+            background-color: rgba(46, 204, 113, 0.15);
+            border-left: 4px solid var(--success);
+            color: #27ae60;
+        }
+        
+        .flash-error {
+            background-color: rgba(231, 76, 60, 0.15);
+            border-left: 4px solid var(--error);
+            color: #c0392b;
+        }
+        
+        .flash-warning {
+            background-color: rgba(243, 156, 18, 0.15);
+            border-left: 4px solid var(--warning);
+            color: #d35400;
+        }
     </style>
 </head>
 <body>
@@ -517,6 +668,31 @@ def start_api_server(indexer, port=5002):
     
     <main class="main-content">
         <div class="container">
+            <!-- Flash Messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="flash-messages">
+                        {% for category, message in messages %}
+                            <div class="flash flash-{{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+            
+            <!-- Add Seed URL Form -->
+            <div class="seed-url-form">
+                <div class="form-title">
+                    <i class="fas fa-plus-circle"></i> Add New URL to Crawl
+                </div>
+                <form action="/submit-url" method="post" id="seed-form">
+                    <div class="form-group">
+                        <input type="text" name="seed_url" class="form-control" placeholder="Enter a URL to crawl (e.g., https://example.com)" required>
+                        <button type="submit" class="btn-submit">Submit URL</button>
+                    </div>
+                    <p class="form-help">Add a new website to be crawled and indexed by our distributed system.</p>
+                </form>
+            </div>
+            
             {% if query %}
                 <div class="results-info">
                     <h2>Results for "{{ query }}"</h2>
@@ -585,6 +761,10 @@ def start_api_server(indexer, port=5002):
                         <div class="stat-value">{{ stats.searches_performed }}</div>
                         <div class="stat-label">Searches Performed</div>
                     </div>
+                    <div class="stat-item">
+                        <div class="stat-value">{{ stats.seed_urls_submitted }}</div>
+                        <div class="stat-label">URLs Submitted</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -595,6 +775,61 @@ def start_api_server(indexer, port=5002):
             <p>Distributed Web Crawling System &copy; 2025 | Advanced Cloud Computing Project</p>
         </div>
     </footer>
+    
+    <script>
+        // Optional: Add JavaScript for AJAX form submission
+        document.addEventListener('DOMContentLoaded', function() {
+            const seedForm = document.getElementById('seed-form');
+            
+            // Uncomment this if you want AJAX submission instead of page reload
+            /*
+            seedForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const url = seedForm.querySelector('input[name="seed_url"]').value;
+                
+                fetch('/submit-url', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: `seed_url=${encodeURIComponent(url)}`
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Create flash message dynamically
+                    const flashContainer = document.querySelector('.flash-messages');
+                    if (!flashContainer) {
+                        const container = document.querySelector('.container');
+                        const newFlashContainer = document.createElement('div');
+                        newFlashContainer.className = 'flash-messages';
+                        container.prepend(newFlashContainer);
+                    }
+                    
+                    const flashElement = document.createElement('div');
+                    flashElement.className = `flash flash-${data.success ? 'success' : 'error'}`;
+                    flashElement.textContent = data.message;
+                    
+                    document.querySelector('.flash-messages').appendChild(flashElement);
+                    
+                    // Clear form if successful
+                    if (data.success) {
+                        seedForm.reset();
+                    }
+                    
+                    // Auto-remove flash after 5 seconds
+                    setTimeout(() => {
+                        flashElement.remove();
+                    }, 5000);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+            });
+            */
+        });
+    </script>
 </body>
 </html>
             ''')
@@ -605,9 +840,10 @@ def main():
     parser = argparse.ArgumentParser(description='Indexer Node for Distributed Web Crawler')
     parser.add_argument('--port', type=int, default=5002, help='Port for the API server')
     parser.add_argument('--index-dir', default='index_data', help='Directory to store the index')
+    parser.add_argument('--crawler-api', default='http://localhost:5001', help='URL for the crawler API')
     args = parser.parse_args()
 
-    indexer = IndexerNode(args.index_dir)
+    indexer = IndexerNode(args.index_dir, args.crawler_api)
     start_api_server(indexer, args.port)
 
 if __name__ == "__main__":
