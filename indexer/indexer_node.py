@@ -31,6 +31,9 @@ class IndexerNode:
         self.hostname = socket.gethostname()
         self.ip_address = socket.gethostbyname(self.hostname)
         self.crawler_api_url = crawler_api_url
+        
+        # Create directory for pending URLs if it doesn't exist
+        self.pending_urls_file = os.path.join(index_dir, "pending_urls.txt")
 
         # Create or open search index
         self.index_dir = index_dir
@@ -42,7 +45,8 @@ class IndexerNode:
             "pages_indexed": 0,
             "index_size_bytes": 0,
             "searches_performed": 0,
-            "seed_urls_submitted": 0
+            "seed_urls_submitted": 0,
+            "pending_urls": self._count_pending_urls()
         }
 
         logging.info(f"Indexer node initialized at {self.ip_address}")
@@ -102,7 +106,8 @@ class IndexerNode:
         """Submit a seed URL to the crawler for processing"""
         if not self.crawler_api_url:
             logging.error("Crawler API URL not configured")
-            return False, "Crawler API URL not configured"
+            self._store_pending_url(url)
+            return False, "Crawler API URL not configured. URL has been saved and will be submitted later."
             
         try:
             # Ensure URL has a scheme
@@ -111,22 +116,30 @@ class IndexerNode:
                 
             # Submit to crawler API
             crawler_endpoint = f"{self.crawler_api_url}/submit"
-            response = requests.post(
-                crawler_endpoint, 
-                json={"url": url}
-            )
-            
-            if response.status_code == 200:
-                self.stats["seed_urls_submitted"] += 1
-                logging.info(f"Seed URL submitted: {url}")
-                return True, "URL successfully submitted for crawling"
-            else:
-                logging.error(f"Failed to submit seed URL: {url}, status: {response.status_code}")
-                return False, f"Failed to submit URL: {response.json().get('error', 'Unknown error')}"
+            try:
+                response = requests.post(
+                    crawler_endpoint, 
+                    json={"url": url},
+                    timeout=3  # Add timeout to avoid long waits
+                )
+                
+                if response.status_code == 200:
+                    self.stats["seed_urls_submitted"] += 1
+                    logging.info(f"Seed URL submitted: {url}")
+                    return True, "URL successfully submitted for crawling"
+                else:
+                    logging.error(f"Failed to submit seed URL: {url}, status: {response.status_code}")
+                    self._store_pending_url(url)
+                    return False, f"Failed to submit URL to crawler, but it has been saved for later submission."
+            except (requests.ConnectionError, requests.Timeout):
+                logging.error(f"Connection to crawler service failed: {self.crawler_api_url}")
+                self._store_pending_url(url)
+                return False, "Crawler service is currently unavailable. URL has been saved and will be submitted later."
                 
         except Exception as e:
             logging.error(f"Error submitting seed URL {url}: {e}")
-            return False, f"Error: {str(e)}"
+            self._store_pending_url(url)
+            return False, f"Error: {str(e)}. URL has been saved for later submission."
 
     def search(self, query_str, max_results=10):
         """Enhanced search with support for field-specific queries and boolean operators"""
@@ -192,6 +205,80 @@ class IndexerNode:
 
         return self.stats
 
+    def retry_pending_urls(self):
+        """Attempt to submit any pending URLs to the crawler"""
+        if not os.path.exists(self.pending_urls_file) or not self.crawler_api_url:
+            return {"success": False, "message": "No pending URLs or crawler API not configured", "submitted": 0, "failed": 0}
+            
+        try:
+            # Read all pending URLs
+            with open(self.pending_urls_file, 'r') as f:
+                pending_urls = [line.strip() for line in f.readlines() if line.strip()]
+                
+            if not pending_urls:
+                return {"success": True, "message": "No pending URLs to submit", "submitted": 0, "failed": 0}
+                
+            # Try to submit each URL
+            submitted = []
+            failed = []
+            
+            for url in pending_urls:
+                try:
+                    response = requests.post(
+                        f"{self.crawler_api_url}/submit",
+                        json={"url": url},
+                        timeout=3
+                    )
+                    
+                    if response.status_code == 200:
+                        submitted.append(url)
+                        self.stats["seed_urls_submitted"] += 1
+                    else:
+                        failed.append(url)
+                except Exception as e:
+                    logging.error(f"Error resubmitting URL {url}: {e}")
+                    failed.append(url)
+            
+            # Write back the failed URLs
+            with open(self.pending_urls_file, 'w') as f:
+                for url in failed:
+                    f.write(f"{url}\n")
+                    
+            # Update stats
+            self.stats["pending_urls"] = len(failed)
+            
+            return {
+                "success": True,
+                "message": f"Resubmitted {len(submitted)} URLs, {len(failed)} remain pending",
+                "submitted": len(submitted),
+                "failed": len(failed)
+            }
+        except Exception as e:
+            logging.error(f"Error retrying pending URLs: {e}")
+            return {"success": False, "message": f"Error: {str(e)}", "submitted": 0, "failed": 0}
+
+    def _count_pending_urls(self):
+        """Count the number of pending URLs"""
+        try:
+            if os.path.exists(self.pending_urls_file):
+                with open(self.pending_urls_file, 'r') as f:
+                    return len(f.readlines())
+            return 0
+        except Exception as e:
+            logging.error(f"Error counting pending URLs: {e}")
+            return 0
+            
+    def _store_pending_url(self, url):
+        """Store a URL that couldn't be submitted due to crawler unavailability"""
+        try:
+            with open(self.pending_urls_file, 'a') as f:
+                f.write(f"{url}\n")
+            self.stats["pending_urls"] = self._count_pending_urls()
+            return True
+        except Exception as e:
+            logging.error(f"Error storing pending URL {url}: {e}")
+            return False
+
 def start_api_server(indexer, port=5002):
     """Start a simple HTTP server to expose indexer node API"""
     app = Flask(__name__)
@@ -237,6 +324,21 @@ def start_api_server(indexer, port=5002):
     def status():
         return jsonify(indexer.get_status())
         
+    @app.route('/retry-pending', methods=['GET', 'POST'])
+    def retry_pending():
+        """Manually trigger resubmission of pending URLs"""
+        result = indexer.retry_pending_urls()
+        
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify(result)
+            
+        if result["success"]:
+            flash(result["message"], "success")
+        else:
+            flash(result["message"], "error")
+            
+        return redirect(url_for('search_interface'))
+
     @app.route('/submit-url', methods=['POST'])
     def submit_url():
         """Handle seed URL submission from web interface"""
@@ -285,7 +387,7 @@ def start_api_server(indexer, port=5002):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebCrawler | Distributed Search Engine</title>
+    <title>NexusCrawl | Distributed Search Engine</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         :root {
@@ -322,7 +424,7 @@ def start_api_server(indexer, port=5002):
         }
         
         header {
-            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            background: linear-gradient(135deg, #1a2a6c 0%, #b21f1f 50%, #fdbb2d 100%);
             color: white;
             padding: 2rem 0;
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
@@ -337,11 +439,20 @@ def start_api_server(indexer, port=5002):
         .brand i {
             font-size: 2rem;
             margin-right: 10px;
+            color: #fdbb2d;
         }
         
         .brand h1 {
             font-weight: 600;
             font-size: 2rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .tagline {
+            font-size: 1.1rem;
+            margin-bottom: 1.5rem;
+            text-align: center;
+            color: rgba(255,255,255,0.9);
         }
         
         .search-container {
@@ -658,6 +769,65 @@ def start_api_server(indexer, port=5002):
             border-left: 4px solid var(--warning);
             color: #d35400;
         }
+        
+        /* Seed URL Examples Styling */
+        .seed-example-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1rem;
+        }
+        
+        .seed-example {
+            display: flex;
+            align-items: center;
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .seed-example:hover {
+            background: #e9f0f8;
+            transform: translateY(-2px);
+        }
+        
+        .seed-icon {
+            font-size: 1.5rem;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--secondary);
+            color: white;
+            border-radius: 8px;
+            margin-right: 0.8rem;
+        }
+        
+        .seed-info {
+            flex: 1;
+        }
+        
+        .seed-name {
+            font-weight: 600;
+            color: var(--primary);
+        }
+        
+        .seed-url {
+            font-size: 0.85rem;
+            color: var(--light-text);
+        }
+        
+        .copy-icon {
+            color: var(--light-text);
+            padding: 0.5rem;
+            font-size: 1.1rem;
+        }
+        
+        .seed-example:hover .copy-icon {
+            color: var(--secondary);
+        }
     </style>
 </head>
 <body>
@@ -665,8 +835,9 @@ def start_api_server(indexer, port=5002):
         <div class="container">
             <div class="brand">
                 <i class="fas fa-spider"></i>
-                <h1>WebCrawler</h1>
+                <h1>NexusCrawl</h1>
             </div>
+            <div class="tagline">Unveiling the web's hidden connections</div>
             <div class="search-container">
                 <form action="/" method="get" class="search-form">
                     <input type="text" name="q" class="search-box" value="{{ query }}" placeholder="Search the distributed web...">
@@ -701,8 +872,17 @@ def start_api_server(indexer, port=5002):
                         <input type="text" name="seed_url" class="form-control" placeholder="Enter a URL to crawl (e.g., https://example.com)" required>
                         <button type="submit" class="btn-submit">Submit URL</button>
                     </div>
-                    <p class="form-help">Add a new website to be crawled and indexed by our distributed system.</p>
+                    <p class="form-help">Add a new website to be crawled and indexed by our distributed system. If the crawler service is unavailable, URLs will be stored locally and submitted later.</p>
                 </form>
+                {% if stats.pending_urls > 0 %}
+                <div style="margin-top: 1rem; text-align: right;">
+                    <form action="/retry-pending" method="post">
+                        <button type="submit" class="btn-submit" style="border-radius: 4px;">
+                            <i class="fas fa-sync-alt"></i> Retry {{ stats.pending_urls }} Pending URLs
+                        </button>
+                    </form>
+                </div>
+                {% endif %}
             </div>
             
             {% if query %}
@@ -747,12 +927,74 @@ def start_api_server(indexer, port=5002):
             {% else %}
                 <div class="stats-card">
                     <div class="stats-title">
-                        <i class="fas fa-spider"></i> Welcome to WebCrawler
+                        <i class="fas fa-spider"></i> Welcome to NexusCrawl
                     </div>
                     <p style="margin-bottom: 1rem;">
                         A high-performance distributed web crawling system built with Python.
                         Enter a search query above to explore the indexed content.
                     </p>
+                </div>
+                
+                <!-- Seed URL Examples -->
+                <div class="stats-card" style="margin-top: 1.5rem;">
+                    <div class="stats-title">
+                        <i class="fas fa-lightbulb"></i> Try These Seed URLs
+                    </div>
+                    <p style="margin-bottom: 1rem;">
+                        Not sure where to start? Try adding these popular websites to the crawler:
+                    </p>
+                    <div class="seed-examples">
+                        <div class="seed-example-grid">
+                            <div class="seed-example" onclick="copyToClipboard('https://en.wikipedia.org')">
+                                <div class="seed-icon"><i class="fab fa-wikipedia-w"></i></div>
+                                <div class="seed-info">
+                                    <div class="seed-name">Wikipedia</div>
+                                    <div class="seed-url">https://en.wikipedia.org</div>
+                                </div>
+                                <div class="copy-icon"><i class="far fa-copy"></i></div>
+                            </div>
+                            <div class="seed-example" onclick="copyToClipboard('https://news.ycombinator.com')">
+                                <div class="seed-icon"><i class="fab fa-hacker-news"></i></div>
+                                <div class="seed-info">
+                                    <div class="seed-name">Hacker News</div>
+                                    <div class="seed-url">https://news.ycombinator.com</div>
+                                </div>
+                                <div class="copy-icon"><i class="far fa-copy"></i></div>
+                            </div>
+                            <div class="seed-example" onclick="copyToClipboard('https://github.com')">
+                                <div class="seed-icon"><i class="fab fa-github"></i></div>
+                                <div class="seed-info">
+                                    <div class="seed-name">GitHub</div>
+                                    <div class="seed-url">https://github.com</div>
+                                </div>
+                                <div class="copy-icon"><i class="far fa-copy"></i></div>
+                            </div>
+                            <div class="seed-example" onclick="copyToClipboard('https://stackoverflow.com')">
+                                <div class="seed-icon"><i class="fab fa-stack-overflow"></i></div>
+                                <div class="seed-info">
+                                    <div class="seed-name">Stack Overflow</div>
+                                    <div class="seed-url">https://stackoverflow.com</div>
+                                </div>
+                                <div class="copy-icon"><i class="far fa-copy"></i></div>
+                            </div>
+                            <div class="seed-example" onclick="copyToClipboard('https://www.reddit.com')">
+                                <div class="seed-icon"><i class="fab fa-reddit-alien"></i></div>
+                                <div class="seed-info">
+                                    <div class="seed-name">Reddit</div>
+                                    <div class="seed-url">https://www.reddit.com</div>
+                                </div>
+                                <div class="copy-icon"><i class="far fa-copy"></i></div>
+                            </div>
+                            <div class="seed-example" onclick="copyToClipboard('https://developer.mozilla.org')">
+                                <div class="seed-icon"><i class="fab fa-firefox-browser"></i></div>
+                                <div class="seed-info">
+                                    <div class="seed-name">MDN Web Docs</div>
+                                    <div class="seed-url">https://developer.mozilla.org</div>
+                                </div>
+                                <div class="copy-icon"><i class="far fa-copy"></i></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             {% endif %}
             
@@ -777,6 +1019,10 @@ def start_api_server(indexer, port=5002):
                         <div class="stat-value">{{ stats.seed_urls_submitted }}</div>
                         <div class="stat-label">URLs Submitted</div>
                     </div>
+                    <div class="stat-item">
+                        <div class="stat-value">{{ stats.pending_urls }}</div>
+                        <div class="stat-label">Pending URLs</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -784,7 +1030,7 @@ def start_api_server(indexer, port=5002):
     
     <footer>
         <div class="container">
-            <p>Distributed Web Crawling System &copy; 2025 | Advanced Cloud Computing Project</p>
+            <p>NexusCrawl - Distributed Web Crawling System &copy; 2025 | Advanced Cloud Computing Project</p>
         </div>
     </footer>
     
@@ -841,6 +1087,44 @@ def start_api_server(indexer, port=5002):
             });
             */
         });
+        
+        // Function to copy seed URL to clipboard and to the form
+        function copyToClipboard(text) {
+            // Copy to clipboard
+            navigator.clipboard.writeText(text).then(() => {
+                // Also fill the form input
+                const seedInput = document.querySelector('input[name="seed_url"]');
+                if (seedInput) {
+                    seedInput.value = text;
+                    seedInput.focus();
+                    
+                    // Create a flash message
+                    const flashContainer = document.querySelector('.flash-messages');
+                    if (!flashContainer) {
+                        const container = document.querySelector('.container');
+                        const newFlashContainer = document.createElement('div');
+                        newFlashContainer.className = 'flash-messages';
+                        container.prepend(newFlashContainer);
+                    }
+                    
+                    const flashElement = document.createElement('div');
+                    flashElement.className = 'flash flash-success';
+                    flashElement.textContent = `Copied "${text}" to form. Click Submit to add it!`;
+                    
+                    document.querySelector('.flash-messages').appendChild(flashElement);
+                    
+                    // Scroll to the form
+                    document.querySelector('.seed-url-form').scrollIntoView({ behavior: 'smooth' });
+                    
+                    // Auto-remove flash after 5 seconds
+                    setTimeout(() => {
+                        flashElement.remove();
+                    }, 5000);
+                }
+            }).catch(err => {
+                console.error('Failed to copy: ', err);
+            });
+        }
     </script>
 </body>
 </html>
@@ -856,6 +1140,15 @@ def main():
     args = parser.parse_args()
 
     indexer = IndexerNode(args.index_dir, args.crawler_api)
+    
+    # Try to resubmit any pending URLs on startup
+    try:
+        result = indexer.retry_pending_urls()
+        if result["submitted"] > 0:
+            logging.info(f"Startup: Resubmitted {result['submitted']} pending URLs, {result['failed']} remain pending")
+    except Exception as e:
+        logging.error(f"Error retrying pending URLs on startup: {e}")
+    
     start_api_server(indexer, args.port)
 
 if __name__ == "__main__":
