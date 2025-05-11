@@ -1254,7 +1254,7 @@ def main():
     parser = argparse.ArgumentParser(description='Indexer Node for Distributed Web Crawler')
     parser.add_argument('--port', type=int, default=5002, help='Port for the API server')
     parser.add_argument('--index-dir', default='index_data', help='Directory to store the index')
-    parser.add_argument('--crawler-api', default='http://localhost:5001', help='URL for the crawler API')
+    parser.add_argument('--crawler-api', default='http://172.31.29.194:5001', help='URL for the crawler API')
     args = parser.parse_args()
 
     indexer = IndexerNode(args.index_dir, args.crawler_api)
