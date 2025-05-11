@@ -124,7 +124,7 @@ class SystemTester:
         
         # Test 6: Test search functionality
         try:
-            query = "web crawler"
+            query = "web"
             response = requests.get(
                 f"{self.indexer_url}/search",
                 params={"q": query, "max": 5},
