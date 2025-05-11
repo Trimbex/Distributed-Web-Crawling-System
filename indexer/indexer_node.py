@@ -196,6 +196,18 @@ def start_api_server(indexer, port=5002):
     """Start a simple HTTP server to expose indexer node API"""
     app = Flask(__name__)
     app.secret_key = os.urandom(24)  # For flash messages
+    
+    # Disable caching and force template reloading
+    app.config['TEMPLATES_AUTO_RELOAD'] = True
+    app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+    
+    @app.after_request
+    def add_header(response):
+        """Add headers to disable caching"""
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '-1'
+        return response
 
     @app.route('/index', methods=['POST'])
     def index_document():
