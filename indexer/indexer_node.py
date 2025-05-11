@@ -212,58 +212,389 @@ def start_api_server(indexer, port=5002):
         with open(search_template, 'w') as f:
             f.write('''
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Distributed Web Crawler - Search</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebCrawler | Distributed Search Engine</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
-        .search-container { margin-bottom: 20px; }
-        .search-box { padding: 10px; width: 70%; font-size: 16px; }
-        .search-button { padding: 10px 20px; font-size: 16px; }
-        .result { margin-bottom: 20px; padding: 10px; border-bottom: 1px solid #ddd; }
-        .result h3 { margin-top: 0; }
-        .result .url { color: green; font-size: 14px; }
-        .result .snippet { font-size: 14px; }
-        .result .meta { color: #777; font-size: 12px; }
-        .stats { margin-top: 30px; font-size: 12px; color: #777; }
+        :root {
+            --primary: #2c3e50;
+            --secondary: #3498db;
+            --accent: #e74c3c;
+            --background: #f8f9fa;
+            --text: #2c3e50;
+            --light-text: #7f8c8d;
+            --card: #ffffff;
+            --border: #ecf0f1;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--background);
+            color: var(--text);
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            padding: 2rem 0;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        
+        .brand {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+        
+        .brand i {
+            font-size: 2rem;
+            margin-right: 10px;
+        }
+        
+        .brand h1 {
+            font-weight: 600;
+            font-size: 2rem;
+        }
+        
+        .search-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .search-form {
+            display: flex;
+            border-radius: 50px;
+            background: white;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .search-box {
+            flex: 1;
+            padding: 15px 25px;
+            border: none;
+            font-size: 1.1rem;
+            outline: none;
+        }
+        
+        .search-button {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 0 30px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .search-button:hover {
+            background: #c0392b;
+        }
+        
+        .main-content {
+            padding: 2rem 0;
+        }
+        
+        .results-info {
+            margin-bottom: 1.5rem;
+            font-weight: 600;
+            color: var(--primary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .results-count {
+            padding: 4px 12px;
+            background: var(--secondary);
+            color: white;
+            border-radius: 20px;
+            font-size: 0.9rem;
+        }
+        
+        .results-container {
+            display: grid;
+            gap: 1.5rem;
+        }
+        
+        .result {
+            background: var(--card);
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            transition: transform 0.2s, box-shadow 0.2s;
+            border-left: 4px solid var(--secondary);
+        }
+        
+        .result:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        
+        .result h3 {
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+        
+        .result h3 a {
+            color: var(--secondary);
+            text-decoration: none;
+        }
+        
+        .result h3 a:hover {
+            text-decoration: underline;
+        }
+        
+        .url {
+            color: #27ae60;
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .snippet {
+            font-size: 0.95rem;
+            margin-bottom: 1rem;
+            color: var(--text);
+            line-height: 1.5;
+        }
+        
+        .match {
+            background-color: #fffacd;
+            padding: 0 2px;
+            font-weight: 600;
+        }
+        
+        .meta {
+            display: flex;
+            gap: 1rem;
+            color: var(--light-text);
+            font-size: 0.8rem;
+            border-top: 1px solid var(--border);
+            padding-top: 0.8rem;
+        }
+        
+        .meta-item {
+            display: flex;
+            align-items: center;
+        }
+        
+        .meta-item i {
+            margin-right: 4px;
+        }
+        
+        .stats-card {
+            background: var(--card);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-top: 2rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        
+        .stats-title {
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+            color: var(--primary);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+        }
+        
+        .stats-title i {
+            margin-right: 8px;
+            color: var(--secondary);
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+        
+        .stat-item {
+            background: #f1f5f9;
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--secondary);
+            margin-bottom: 0.3rem;
+        }
+        
+        .stat-label {
+            color: var(--light-text);
+            font-size: 0.9rem;
+        }
+        
+        footer {
+            text-align: center;
+            padding: 2rem 0;
+            margin-top: 2rem;
+            color: var(--light-text);
+            font-size: 0.9rem;
+            border-top: 1px solid var(--border);
+        }
+        
+        @media (max-width: 768px) {
+            .search-form {
+                flex-direction: column;
+                border-radius: 8px;
+            }
+            
+            .search-button {
+                padding: 12px;
+            }
+            
+            .meta {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+        }
+        
+        .no-results {
+            background: var(--card);
+            border-radius: 8px;
+            padding: 2rem;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        
+        .no-results i {
+            font-size: 3rem;
+            color: var(--light-text);
+            margin-bottom: 1rem;
+        }
+        
+        .no-results h3 {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        
+        .no-results p {
+            color: var(--light-text);
+        }
     </style>
 </head>
 <body>
-    <h1>Distributed Web Crawler Search</h1>
+    <header>
+        <div class="container">
+            <div class="brand">
+                <i class="fas fa-spider"></i>
+                <h1>WebCrawler</h1>
+            </div>
+            <div class="search-container">
+                <form action="/" method="get" class="search-form">
+                    <input type="text" name="q" class="search-box" value="{{ query }}" placeholder="Search the distributed web...">
+                    <button type="submit" class="search-button">
+                        <i class="fas fa-search"></i> Search
+                    </button>
+                </form>
+            </div>
+        </div>
+    </header>
     
-    <div class="search-container">
-        <form action="/" method="get">
-            <input type="text" name="q" class="search-box" value="{{ query }}" placeholder="Enter search query...">
-            <button type="submit" class="search-button">Search</button>
-        </form>
-    </div>
-    
-    {% if query %}
-        <h2>Search Results for "{{ query }}"</h2>
-        {% if results %}
-            {% for result in results %}
-                <div class="result">
-                    <h3><a href="{{ result.url }}">{{ result.title }}</a></h3>
-                    <div class="url">{{ result.url }}</div>
-                    <div class="snippet">{{ result.snippet|safe }}</div>
-                    <div class="meta">
-                        Domain: {{ result.domain }} | 
-                        Crawled: {{ result.crawl_date }} | 
-                        Score: {{ result.score }}
+    <main class="main-content">
+        <div class="container">
+            {% if query %}
+                <div class="results-info">
+                    <h2>Results for "{{ query }}"</h2>
+                    {% if results %}
+                        <span class="results-count">{{ results|length }} results</span>
+                    {% endif %}
+                </div>
+                
+                {% if results %}
+                    <div class="results-container">
+                        {% for result in results %}
+                            <article class="result">
+                                <h3><a href="{{ result.url }}" target="_blank">{{ result.title }}</a></h3>
+                                <div class="url">{{ result.url }}</div>
+                                <div class="snippet">{{ result.snippet|safe }}</div>
+                                <div class="meta">
+                                    <div class="meta-item">
+                                        <i class="fas fa-globe"></i>
+                                        {{ result.domain }}
+                                    </div>
+                                    <div class="meta-item">
+                                        <i class="far fa-calendar"></i>
+                                        {{ result.crawl_date }}
+                                    </div>
+                                    <div class="meta-item">
+                                        <i class="fas fa-chart-line"></i>
+                                        Score: {{ "%.2f"|format(result.score) }}
+                                    </div>
+                                </div>
+                            </article>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="no-results">
+                        <i class="fas fa-search"></i>
+                        <h3>No results found</h3>
+                        <p>Try different keywords or check your spelling</p>
+                    </div>
+                {% endif %}
+            {% else %}
+                <div class="stats-card">
+                    <div class="stats-title">
+                        <i class="fas fa-spider"></i> Welcome to WebCrawler
+                    </div>
+                    <p style="margin-bottom: 1rem;">
+                        A high-performance distributed web crawling system built with Python.
+                        Enter a search query above to explore the indexed content.
+                    </p>
+                </div>
+            {% endif %}
+            
+            <div class="stats-card">
+                <div class="stats-title">
+                    <i class="fas fa-chart-pie"></i> System Statistics
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value">{{ stats.pages_indexed }}</div>
+                        <div class="stat-label">Documents Indexed</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">{{ stats.index_size_mb }}</div>
+                        <div class="stat-label">Index Size (MB)</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">{{ stats.searches_performed }}</div>
+                        <div class="stat-label">Searches Performed</div>
                     </div>
                 </div>
-            {% endfor %}
-        {% else %}
-            <p>No results found.</p>
-        {% endif %}
-    {% endif %}
+            </div>
+        </div>
+    </main>
     
-    <div class="stats">
-        <h3>Indexer Statistics</h3>
-        <p>Documents indexed: {{ stats.pages_indexed }}</p>
-        <p>Index size: {{ stats.index_size_mb }} MB</p>
-        <p>Searches performed: {{ stats.searches_performed }}</p>
-    </div>
+    <footer>
+        <div class="container">
+            <p>Distributed Web Crawling System &copy; 2025 | Advanced Cloud Computing Project</p>
+        </div>
+    </footer>
 </body>
 </html>
             ''')
