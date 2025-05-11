@@ -1,7 +1,11 @@
 # WebCrawl - Distributed Web Crawling System
 
 A high-performance, distributed web crawling and search system built with Python. This project implements a complete search engine solution with distributed crawling, content indexing, and a modern search interface.
-![Video Demo](https://github.com/Trimbex/Distributed-Web-Crawling-System/blob/00b96ccfda85df60515f7db08ae806e5c713bc05/images/2025-05-11%2022-27-57.mp4)
+
+
+https://github.com/user-attachments/assets/e5b32947-65c8-4131-a366-0545aa2deeb4
+
+
 <div align="center">
 
   <p><i>WebCrawl System Demo</i></p>
