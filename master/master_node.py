@@ -275,7 +275,15 @@ def monitor_tasks(master, check_interval=30):
 def main():
     parser = argparse.ArgumentParser(description='Master Node for Distributed Web Crawler')
     parser.add_argument('--port', type=int, default=5000, help='Port for the API server')
-    parser.add_argument('--seed-urls', nargs='+', default=['https://example.com'], help='Seed URLs to start crawling')
+    parser.add_argument('--seed-urls', nargs='+', default=[
+        'https://example.com',
+        'https://www.wikipedia.org',
+        'https://www.github.com',
+        'https://news.ycombinator.com',
+        'https://www.reddit.com',
+        'https://www.stackoverflow.com',
+        'https://www.medium.com'
+    ], help='Seed URLs to start crawling')
     parser.add_argument('--use-sqs', action='store_true', help='Use Amazon SQS for task queuing')
     parser.add_argument('--region', default='us-east-1', help='AWS region for SQS')
     args = parser.parse_args()
