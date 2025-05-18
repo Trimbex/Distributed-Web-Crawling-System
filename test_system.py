@@ -399,8 +399,18 @@ class SystemTester:
                 )
                 
                 # Wait for crawling
-                test_duration = 180  # 3 minutes per test
-                time.sleep(test_duration)
+                test_duration = 60  # 1 minute per test instead of 3 minutes
+                
+                # Start the test
+                logging.info(f"Starting scalability test for {crawler_count} crawler(s)...")
+                
+                # Sleep for 45 seconds, then notify to add another crawler
+                if crawler_count > 1:
+                    time.sleep(45)
+                    logging.warning(f"45 SECONDS PASSED: Please open/start crawler #{crawler_count} now if not already running!")
+                    time.sleep(test_duration - 45)
+                else:
+                    time.sleep(test_duration)
                 
                 # Record final state
                 response = requests.get(f"{self.master_url}/status", timeout=5)
